@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="theme-color" content="#000000">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Коллаж">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Фотоколлаж</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+    overflow: hidden;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  #collage {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #000;
+  }
+
+  /* лента (раскладки 2/3/4): вертикальная прокрутка всех фото */
+  #collage.tape-mode {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  #collage.tape-mode::-webkit-scrollbar { display: none; }
+  #tape { position: relative; width: 100%; }
+
+  /* курсор ленты — выделенная ячейка при навигации пультом */
+  .cell.cursorcell {
+    outline: 4px solid #fff;
+    outline-offset: -4px;
+    -webkit-box-shadow: inset 0 0 0 2px #000;
+    box-shadow: inset 0 0 0 2px #000;
+  }
+
+  .cell {
+    position: absolute;
+    background: #161616;
+    overflow: hidden;
+    border: 1px solid #000;
+    -webkit-box-sizing: border-box;
+    box-sizing: border-box;
+  }
+
+  .layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-position: center center;
+    background-repeat: no-repeat;
+    -webkit-background-size: cover;
+    background-size: cover;
+    opacity: 0;
+    -webkit-transition: opacity 0.9s ease-in-out;
+    transition: opacity 0.9s ease-in-out;
+  }
+  .layer.visible { opacity: 1; }
+
+  /* ячейки-ссылки на соседние страницы (первый столбец) */
+  .cell.navcell { background: #0d0d0d; }
+  .navlabel {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    padding: 4px 0;
+    background: rgba(0,0,0,0.65);
+    color: #ccc;
+    font-family: sans-serif;
+    font-size: 18px;
+    text-align: center;
+  }
+
+  /* кликабельные/наводимые элементы — видимый фокус для пульта */
+  .focusable { cursor: pointer; }
+  .focusable:focus {
+    outline: 4px solid #fff;
+    outline-offset: -4px;
+    -webkit-box-shadow: inset 0 0 0 2px #000;
+    box-shadow: inset 0 0 0 2px #000;
+  }
+
+  /* статистика + выбор страницы (правый нижний блок) */
+  .stats {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: #101010;
+    font-family: sans-serif;
+    color: #ddd;
+    text-align: center;
+    -webkit-transition: opacity 0.9s ease-in-out;
+    transition: opacity 0.9s ease-in-out;
+  }
+  .stats .line1 { margin-top: 3%; font-size: 24px; }
+  /* statsBox — флекс-родитель: вертикальный поток, отступы,
+     центрирование содержимого в ячейке */
+  #statsBox {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    display: -webkit-flex; display: flex;
+    -webkit-flex-direction: column; flex-direction: column;
+    -webkit-justify-content: center; justify-content: center;
+    -webkit-align-items: center; align-items: center;
+  }
+  #statsBox > div { margin: 4px 0; }
+  #statsBox .pausemark { margin-top: 14px; }
+  .stats .pausemark { color: #ffd54f; font-size: 20px; height: 24px; }
+  .stats .pausemark:focus {
+    outline: 3px solid #fff;
+    outline-offset: 2px;
+    background: rgba(255, 255, 255, 0.12);
+    -webkit-border-radius: 6px; border-radius: 6px;
+  }
+
+  /* счётчик «N из M фото» — низ первого столбца (flex-родитель) */
+  .seenbox {
+    font-family: sans-serif;
+    color: #999;
+    text-align: center;
+  }
+  .seenbox .seenico {
+    display: block;
+    text-align: center;
+    font-size: 26px;
+    line-height: 30px;
+    opacity: 0.85;
+  }
+  .seenbox span {
+    display: block;
+    line-height: 24px;
+    font-weight: bold;
+    color: #bbb;
+  }
+  .seenbox .bar {
+    width: 80%; height: 8px; margin: 6px auto 0;
+    background: #2a2a2a; border: 1px solid #444;
+    -webkit-border-radius: 4px; border-radius: 4px;
+    overflow: hidden;
+  }
+  .seenbox .bar i {
+    display: block; height: 100%; width: 0;
+    background: #7fb2f0;
+  }
+
+  .stats .bar {
+    width: 70%; height: 12px; margin: 2% auto;
+    background: #2a2a2a; border: 1px solid #555;
+    -webkit-border-radius: 6px; border-radius: 6px;
+    overflow: hidden;
+  }
+  .stats .bar i {
+    display: block; height: 100%; width: 0;
+    background: #7fb2f0;
+  }
+  .pager { margin-top: 1%; }
+  .pager button {
+    display: inline-block;
+    width: 64px; height: 64px;
+    margin: 0 20px;
+    font-family: sans-serif;
+    font-size: 36px;
+    line-height: 64px;
+    color: #fff;
+    background: #333;
+    border: 1px solid #666;
+    -webkit-border-radius: 10px; border-radius: 10px;
+    cursor: pointer;
+    outline: none;
+    vertical-align: middle;
+  }
+  .pager button:focus {
+    background: #555;
+    outline: 4px solid #fff;
+    outline-offset: -2px;
+  }
+  .pager .pagenum {
+    display: inline-block;
+    min-width: 170px;
+    font-size: 27px;
+    vertical-align: middle;
+    color: #fff;
+  }
+  .pager .pagenum small { font-size: 17px; color: #aaa; }
+
+  #msg {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 100%;
+    text-align: center;
+    color: #888;
+    font-family: sans-serif;
+    font-size: 20px;
+    -webkit-transform: translateY(-50%);
+    transform: translateY(-50%);
+    display: none;
+  }
+
+  /* ---------- мобильное: гейт поворота + плавающее меню ---------- */
+
+  #gate {
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: #000;
+    z-index: 99;
+    display: none;
+  }
+  #gate.visible { display: block; }
+  #gate .phone {
+    width: 130px; height: 70px;
+    border: 5px solid #999;
+    -webkit-border-radius: 16px; border-radius: 16px;
+    margin: 40vh auto 0;
+    position: relative;
+    -webkit-animation: gaterot 1.6s ease-in-out infinite alternate;
+    animation: gaterot 1.6s ease-in-out infinite alternate;
+  }
+  #gate .phone i {
+    position: absolute;
+    right: 8px; top: 50%;
+    width: 12px; height: 12px;
+    margin-top: -6px;
+    background: #999;
+    -webkit-border-radius: 6px; border-radius: 6px;
+  }
+  @-webkit-keyframes gaterot {
+    from { -webkit-transform: rotate(0); }
+    to   { -webkit-transform: rotate(-90deg); }
+  }
+  @keyframes gaterot {
+    from { transform: rotate(0); }
+    to   { transform: rotate(-90deg); }
+  }
+  #gate p {
+    margin-top: 26px;
+    text-align: center;
+    color: #ccc;
+    font-family: sans-serif;
+    font-size: 18px;
+  }
+  #gateSkip {
+    display: block;
+    margin: 30px auto 0;
+    padding: 10px 22px;
+    font-family: sans-serif;
+    font-size: 16px;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    -webkit-border-radius: 22px; border-radius: 22px;
+  }
+
+  /* плашка об ошибке JS — немой пустой экран теперь невозможен */
+  #errbox {
+    position: absolute;
+    top: 0; left: 0; width: 100%;
+    background: #a00; color: #fff;
+    font-family: sans-serif;
+    font-size: 14px;
+    padding: 6px 10px;
+    -webkit-box-sizing: border-box; box-sizing: border-box;
+    z-index: 200;
+    display: none;
+    word-break: break-all;
+  }
+
+  /* тост обновления версии */
+  #updtoast {
+    position: absolute;
+    left: 50%; bottom: 18px;
+    -webkit-transform: translateX(-50%);
+    transform: translateX(-50%);
+    background: rgba(20, 20, 20, 0.92);
+    border: 1px solid #555;
+    -webkit-border-radius: 12px; border-radius: 12px;
+    padding: 12px 18px;
+    color: #eee;
+    font-family: sans-serif;
+    font-size: 16px;
+    z-index: 300;
+    display: none;
+  }
+  #updtoast.visible { display: block; }
+  #updtoast button {
+    margin-left: 14px;
+    padding: 8px 18px;
+    font-size: 15px;
+    color: #fff;
+    background: #7fb2f0;
+    border: none;
+    -webkit-border-radius: 16px; border-radius: 16px;
+    cursor: pointer;
+  }
+
+  #tmenu {
+    position: fixed;
+    right: 10px;
+    top: 50%;
+    z-index: 50;
+    -webkit-transform: translateY(-50%);
+    transform: translateY(-50%);
+    display: none;
+    background: transparent;
+  }
+  #tmenu.visible { display: block; }
+  #tmenu button {
+    display: block;
+    width: 54px; height: 54px;
+    margin: 10px 0;
+    font-family: sans-serif;
+    font-size: 17px;
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    -webkit-border-radius: 27px; border-radius: 27px;
+    cursor: pointer;
+    outline: none;
+  }
+  #tmenu button.active {
+    background: rgba(127, 178, 240, 0.45);
+    border-color: #fff;
+  }
+</style>
+</head>
+<body>
+  <div id="collage"></div>
+  <div id="msg"></div>
+  <div id="errbox"></div>
+  <div id="gate"><div class="phone"><i></i></div><p>Поверните устройство горизонтально</p><button type="button" id="gateSkip">Смотреть как есть</button></div>
+  <div id="tmenu"></div>
+  <div id="updtoast">Вышло обновление коллажа<button type="button" id="updReload">Обновить</button></div>
+
+  <script>
+    // любая ошибка JS — сразу на экран, а не немой пустой экран
+    window.onerror = function (msg, src, line) {
+      var el = document.getElementById('errbox');
+      if (el) {
+        el.style.display = 'block';
+        el.innerHTML = 'Ошибка: ' + msg + ' (' + line + ')';
+      }
+      return false;
+    };
+  </script>
+  <script src="version.js?v=8"></script>
+  <script src="config.js?v=8"></script>
+  <script src="app.js?v=8"></script>
+  <script>
+    if (document.addEventListener) {
+      document.addEventListener('DOMContentLoaded', function () { Collage.init(); });
+    } else {
+      window.onload = function () { Collage.init(); };
+    }
+  </script>
+</body>
+</html>

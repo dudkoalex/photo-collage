@@ -1,0 +1,10 @@
+# Файлы сборки не хранятся в репозитории
+node_modules/
+photos_mid/
+photos_thumb/
+config.js
+version.js
+
+# Системное
+.DS_Store
+Thumbs.db

@@ -1,0 +1,16 @@
+{
+  "name": "photo-collage",
+  "version": "1.0.0",
+  "description": "Альбомоагностичный шаблон фотоколлажа для ТВ и мобильных: положите фото в photos-src и запустите npm start",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "serve": "http-server . -p 8080 -c-1",
+    "start": "npm run build && npm run serve"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1",
+    "jimp": "^0.22.12"
+  }
+}
